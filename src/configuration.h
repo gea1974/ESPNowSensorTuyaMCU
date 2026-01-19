@@ -1,5 +1,6 @@
 
 #define PRODUCT                             "ESP-NOW Tuya Sensor"
+#define PRODUCT_FAMILY_KEY                  0x01
 #define VERSION                             0x001000
 #define OWNER                               "gea"
 

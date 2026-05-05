@@ -1,11 +1,14 @@
 
 #define PRODUCT                             "ESP-NOW Tuya Sensor"
 #define PRODUCT_FAMILY_KEY                  0x01
-#define VERSION                             0x001001
+#define VERSION                             0x001100
 #define OWNER                               "gea"
 
 #define ESPNOW_TELEGRAM_EXTENDED
 #define ESPNOW_TELEGRAM_PROGRAM             0xA0
+
+//#define TUYA_PROTOCOL_VERSION               0x00                //Legacy
+//#define TUYA_PROTOCOL_VERSION               0x02                //Zigbee
 
     #ifdef D06_WINDOW_SENSOR
         //Product
@@ -172,6 +175,27 @@
         #define TUYA_BAUD_RATE                  115200
     #endif  
 
+    #ifdef SCENE_CUBE
+        #define PRODUCT_ID                      "SCSC"
+        #define DESCRIPTION                     "Smart cube scene controller"
+        #define PRODUCT_KEY                     0x30
+        #define DPID_STATE                      32
+        #define DPID_STATE_DPID_AS_VALUE                                  //Unassigned DPID used as state value
+        #define DPID_BATTERY                    1
+        #ifdef ESP32C2WROOM06
+            #define POWER_OFF_DEEPSLEEP
+            #define DEEPSLEEP_WAKEUP_GPIO_PIN1  5
+            #define TUYA_MCU_WAKEUP_PIN         4                 //ESP8684-WROOM-06, ESP8685-WROOM-06 (ZTU Replacement)   
+            #define SETUP_PIN                   9
+            #define SETUP_PIN_POLARITY          LOW
+            #define SERIAL_TUYA_TX_PIN          18
+            #define SERIAL_TUYA_RX_PIN          10
+            #define SERIAL_TUYA_PORT            1 
+        #endif
+        #define ESPNOW_SEND_DATA_COMPLETE
+        #define TUYA_PROTOCOL_VERSION           0x02                //Zigbee
+        #define TUYA_BAUD_RATE                  115200
+    #endif  
 
 //Tuya default configuration
 #ifndef TUYA_BAUD_RATE
@@ -183,15 +207,38 @@
 #ifndef TUYA_PRODUCT_REQUEST_TIMEOUT
     #define TUYA_PRODUCT_REQUEST_TIMEOUT        500
 #endif
+#ifndef TUYA_PROTOCOL_VERSION
+    #define TUYA_PROTOCOL_VERSION               0x00                //Legacy
+#endif
+#ifndef TUYA_PROTOCOL_HEADER
+    #define TUYA_PROTOCOL_HEADER               0x55AA
+#endif
+
+#ifndef TUYA_PRODUCT_REQUEST
+    #define TUYA_PRODUCT_REQUEST                true
+#endif
+#ifndef TUYA_SEND_NETWORK_STATE
+    #define TUYA_SEND_NETWORK_STATE             true
+#endif
+
+#ifdef TUYA_MCU_WAKEUP_PIN
+    #ifndef TUYA_MCU_WAKEUP_SEND_DELAY     
+        #define TUYA_MCU_WAKEUP_SEND_DELAY      10
+    #endif
+    #ifndef TUYA_MCU_WAKEUP_PULSE_LEN     
+        #define TUYA_MCU_WAKEUP_PULSE_LEN       60
+    #endif
+#endif
+
 
 #ifndef PRODUCT_ID
-    #define PRODUCT_ID                          "SENSOR"
+    #define PRODUCT_ID                          "TUYA"
 #endif
 #ifndef PRODUCT_KEY
     #define PRODUCT_KEY                         0x00
 #endif
 #ifndef DESCRIPTION
-    #define DESCRIPTION                         "Generic Sensor"
+    #define DESCRIPTION                         "Tuya Sensor"
 #endif
 
 #include <lib/configuration_defaults.h>

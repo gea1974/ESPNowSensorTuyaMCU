@@ -9,6 +9,7 @@
 
 //#define TUYA_PROTOCOL_VERSION               0x00                //Legacy
 //#define TUYA_PROTOCOL_VERSION               0x02                //Zigbee
+//#define TUYA_PROTOCOL_VERSION               0x03                //Extended
 
     #ifdef D06_WINDOW_SENSOR
         //Product
@@ -65,6 +66,15 @@
             #define ACTIVE_PIN_POLARITY         LOW
             #define SERIAL_DEBUG_SW
             #define SERIAL_TUYA_PORT            0
+        #endif
+        #ifdef ESP32C2WROOM01C
+            #define SERIAL_TUYA_TX_PIN          20
+            #define SERIAL_TUYA_RX_PIN          19
+            #define SERIAL_TUYA_PORT            0
+            #define SERIAL_DEBUG_TX_PIN         5
+            #define SERIAL_DEBUG_RX_PIN         6
+            #define SERIAL_DEBUG_PORT           1 
+            #define BAUD_RATE_DEBUG             115200
         #endif
         #define ESPNOW_SEND_DATA_COMPLETE
         #define TUYA_BAUD_RATE              9600
@@ -141,6 +151,7 @@
         #define DESCRIPTION                     "Y09 Water Detection Sensor"
         #define PRODUCT_KEY                      0x06
         #define DPID_STATE                      1
+        #define DPID_STATE_POLARITY             0
         #define DPID_BATTERY                    3
         #define ESPNOW_ALIVE
         #define TUYA_PRODUCT_REQUEST_TIMEOUT    3000

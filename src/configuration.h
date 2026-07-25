@@ -1,11 +1,26 @@
 
 #define PRODUCT                             "ESP-NOW Tuya Sensor"
 #define PRODUCT_FAMILY_KEY                  0x01
-#define VERSION                             0x001100
+#define VERSION                             0x001201
 #define OWNER                               "gea"
 
 #define ESPNOW_TELEGRAM_EXTENDED
-#define ESPNOW_TELEGRAM_PROGRAM             0xA0
+#define ESPNOW_TELEGRAM_PROGRAM                 0xA0
+
+#define TUYA_STARTSEQ_DELAY                     0
+#define TUYA_STARTSEQ_HEARTBEAT                 1
+#define TUYA_STARTSEQ_PRODUCT                   2
+#define TUYA_STARTSEQ_NETWORKSTATE              3
+#define TUYA_STARTSEQ_WORKINGMODE               4
+#define TUYA_STARTSEQ_DP_STATUS                 5
+#define TUYA_STARTSEQ_HEARTBEAT_RESTART_DONE    6
+#define TUYA_STARTSEQ_NOP                       98
+#define TUYA_STARTSEQ_DONE                      99
+
+#define TUYA_QUERY_OFF                          0
+#define TUYA_QUERY_ONCE                         1
+#define TUYA_QUERY_CYCLIC                       2    
+#define TUYA_QUERY_ON                           3
 
 //#define TUYA_PROTOCOL_VERSION               0x00                //Legacy
 //#define TUYA_PROTOCOL_VERSION               0x02                //Zigbee
@@ -154,7 +169,7 @@
         #define DPID_STATE_POLARITY             0
         #define DPID_BATTERY                    3
         #define ESPNOW_ALIVE
-        #define TUYA_PRODUCT_REQUEST_TIMEOUT    3000
+        #define TUYA_PRODUCT_QUERY_TIMEOUT    3000
         #define CONFIG_MODE_TIMEOUT             60000
         #ifdef TYWE3S
             #define ACTIVE_PIN                  2
@@ -186,6 +201,30 @@
         #define TUYA_BAUD_RATE                  115200
     #endif  
 
+   #ifdef TR01_SOIL_SENSOR
+        #define PRODUCT_ID                      "TR01"
+        #define DESCRIPTION                     "TR01 Soil Tester Sensor"
+        #define PRODUCT_KEY                     0x08
+        #define DPID_BATTERY                    15          //0x0F	100		        Battery
+//        #define DPID_STATE                      1           //0x09	1		        0=°C 1=°F (Double Click on Button to toggle)
+        #define DPID_VALUE1                     5           //0x05	298	    29,8 °C	Temperature
+        #define DPID_VALUE2                     3           //0x03	0	    0%	    Humidity
+//        #define DPID_VALUE3                     101         //0x65	856	    85,6 °F	Temperature
+        #ifdef ESP32C2WROOM06
+            #define ACTIVE_PIN                  5
+            #define ACTIVE_PIN_POLARITY         HIGH
+            #define SETUP_PIN                   9
+            #define SETUP_PIN_POLARITY          LOW
+            #define SERIAL_TUYA_TX_PIN          18
+            #define SERIAL_TUYA_RX_PIN          10
+            #define SERIAL_TUYA_PORT            1 
+        #endif
+        #define ESPNOW_SEND_DATA_COMPLETE
+        #define TUYA_PROTOCOL_VERSION           0x03 
+        #define TUYA_BAUD_RATE                  115200
+        #define TUYA_STARTSEQ                   {TUYA_STARTSEQ_DELAY, TUYA_STARTSEQ_HEARTBEAT, TUYA_STARTSEQ_PRODUCT, TUYA_STARTSEQ_WORKINGMODE, TUYA_STARTSEQ_HEARTBEAT_RESTART_DONE ,TUYA_STARTSEQ_NETWORKSTATE, TUYA_STARTSEQ_DP_STATUS, TUYA_STARTSEQ_DONE}
+    #endif  
+
     #ifdef SCENE_CUBE
         #define PRODUCT_ID                      "SCSC"
         #define DESCRIPTION                     "Smart cube scene controller"
@@ -208,6 +247,8 @@
         #define TUYA_BAUD_RATE                  115200
     #endif  
 
+
+
 //Tuya default configuration
 #ifndef TUYA_BAUD_RATE
     #define TUYA_BAUD_RATE                      9600
@@ -215,21 +256,40 @@
 #ifndef TUYA_SEND_STARTUP_DELAY
     #define TUYA_SEND_STARTUP_DELAY             0
 #endif
-#ifndef TUYA_PRODUCT_REQUEST_TIMEOUT
-    #define TUYA_PRODUCT_REQUEST_TIMEOUT        500
+#ifndef TUYA_QUERY_TIMEOUT
+    #define TUYA_QUERY_TIMEOUT                  500
+#endif
+#ifndef TUYA_HEARTBEAT_INTERVAL
+    #define TUYA_HEARTBEAT_INTERVAL             5000
+#endif
+#ifndef TUYA_HEARTBEAT_RETRY
+    #define TUYA_HEARTBEAT_RETRY                1000
 #endif
 #ifndef TUYA_PROTOCOL_VERSION
     #define TUYA_PROTOCOL_VERSION               0x00                //Legacy
 #endif
 #ifndef TUYA_PROTOCOL_HEADER
-    #define TUYA_PROTOCOL_HEADER               0x55AA
+    #define TUYA_PROTOCOL_HEADER                0x55AA
 #endif
 
-#ifndef TUYA_PRODUCT_REQUEST
-    #define TUYA_PRODUCT_REQUEST                true
+#ifndef TUYA_STARTSEQ
+    #define TUYA_STARTSEQ                       {TUYA_STARTSEQ_DELAY, TUYA_STARTSEQ_PRODUCT, TUYA_STARTSEQ_NETWORKSTATE, TUYA_STARTSEQ_DONE}
+#endif
+
+#ifndef TUYA_HEARTBEAT
+    #define TUYA_HEARTBEAT                      TUYA_QUERY_CYCLIC          //TUYA_QUERY_OFF, TUYA_QUERY_ONCE,TUYA_QUERY_CYCLIC 
+#endif
+#ifndef TUYA_PRODUCT_QUERY
+    #define TUYA_PRODUCT_QUERY                  TUYA_QUERY_ONCE            //TUYA_QUERY_OFF, TUYA_QUERY_ONCE
+#endif
+#ifndef TUYA_WORKINGMODE_QUERY
+    #define TUYA_WORKINGMODE_QUERY              TUYA_QUERY_ONCE            //TUYA_QUERY_OFF, TUYA_QUERY_ONCE
 #endif
 #ifndef TUYA_SEND_NETWORK_STATE
-    #define TUYA_SEND_NETWORK_STATE             true
+    #define TUYA_SEND_NETWORK_STATE             TUYA_QUERY_ON              //TUYA_QUERY_OFF, TUYA_QUERY_ONCE, TUYA_QUERY_ON
+#endif
+#ifndef TUYA_DP_STATUS_QUERY
+    #define TUYA_DP_STATUS_QUERY                TUYA_QUERY_ONCE            //TUYA_QUERY_OFF, TUYA_QUERY_ONCE, TUYA_QUERY_ON
 #endif
 
 #ifdef TUYA_MCU_WAKEUP_PIN
@@ -240,6 +300,9 @@
         #define TUYA_MCU_WAKEUP_PULSE_LEN       60
     #endif
 #endif
+
+
+
 
 
 #ifndef PRODUCT_ID

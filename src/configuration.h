@@ -206,10 +206,13 @@
         #define DESCRIPTION                     "TR01 Soil Tester Sensor"
         #define PRODUCT_KEY                     0x08
         #define DPID_BATTERY                    15          //0x0F	100		        Battery
-//        #define DPID_STATE                      1           //0x09	1		        0=°C 1=°F (Double Click on Button to toggle)
+//        #define DPID_STATE                    1           //0x09	1		        0=°C 1=°F (Double Click on Button to toggle)
         #define DPID_VALUE1                     5           //0x05	298	    29,8 °C	Temperature
         #define DPID_VALUE2                     3           //0x03	0	    0%	    Humidity
-//        #define DPID_VALUE3                     101         //0x65	856	    85,6 °F	Temperature
+//        #define DPID_VALUE3                   101         //0x65	856	    85,6 °F	Temperature
+        #define DPID_BATTERY_ESPNOW             3           //TH01 compatibility
+        #define DPID_VALUE1_ESPNOW              1  
+        #define DPID_VALUE2_ESPNOW              2
         #ifdef ESP32C2WROOM06
             #define ACTIVE_PIN                  5
             #define ACTIVE_PIN_POLARITY         HIGH

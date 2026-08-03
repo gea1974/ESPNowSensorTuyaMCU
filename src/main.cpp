@@ -31,11 +31,18 @@ uint8_t   tuyaHeartbeatRestart          = 0;
 #define   NETWORKSTATE_CONFIG           1
 #define   NETWORKSTATE_CONNECTING       2
 #define   NETWORKSTATE_CONNECTED        3
+#define   NETWORKSTATE_CONFIG_REQ       11
+#define   NETWORKSTATE_CONNECTING_REQ   12
+#define   NETWORKSTATE_CONNECTED_REQ    13
+
+
 uint8_t   tuyaNetworkState              = NETWORKSTATE_DISCONNECTED;
 
 uint8_t   tuyaSettingsModeReply         = 0;
 uint8_t   tuyaSendDataRecordReply       = 0;
 uint8_t   tuyaSendDPCacheReply          = 0;
+uint8_t   tuyaGetWifiSignalReply        = 0;
+uint8_t   queryFirmwareVersion          = 0;
 
 unsigned long tuyaQueryTime             = millis();
 unsigned long tuyaHeartbeatTime         = 0;
@@ -45,6 +52,8 @@ uint16_t  tuyaTelegramSeq               = 0;
 #ifdef TUYA_MCU_WAKEUP_PIN
 unsigned long tuyaMcuWakeupTime         = 0;
 #endif
+
+bool sensorActivity=false;
 
 char tuyaReceivedBytes[128]{0};
 uint8_t tuyaRxByteCount{0};
@@ -68,9 +77,10 @@ const char sendHeartbeat[]                        = {0x00};                     
 const char queryProductInfo[]                     = {0x01};                     //Query product information
 const char queryWorkingMode[]                     = {0x02};                     //Query working mode
 const char queryDpStatus[]                        = {0x08};                     //Query dp status
+const char queryFirmware[]                        = {0x0B};                     //Query MCU firmware version
 
-const char reportNetworkStatusConfig[4][2]        = { {0x02, 0x00}, {0x02, 0x00}, {0x02, 0x00}, {0x03, 0x01} };               //Network Status: Configuration
-const char reportNetworkStatusConnecting[4][2]    = { {0x02, 0x02}, {0x02, 0x00}, {0x02, 0x00}, {0x03, 0x02} };               //Network Status: Connecting
+const char reportNetworkStatusConfig[4][2]        = { {0x02, 0x00}, {0x02, 0x00}, {0x02, 0x03}, {0x03, 0x01} };               //Network Status: Configuration
+const char reportNetworkStatusConnecting[4][2]    = { {0x02, 0x02}, {0x02, 0x00}, {0x02, 0x01}, {0x03, 0x02} };               //Network Status: Connecting
 const char reportNetworkStatusConnected[4][2]     = { {0x02, 0x04}, {0x02, 0x00}, {0x02, 0x01}, {0x03, 0x04} };               //Network Status: Connected
 
 const char confirmSettingMode3[]                  = {0x03};                     //Confirm Reset Wifi = enter configuration mode
@@ -80,6 +90,8 @@ const char confirmReportRecord6[]                 = {0x06, 0x01};               
 const char confirmReportRecord8[]                 = {0x08, 0x00};               //Confirm Report the real-time status with storage function success
 const char confirmReportRecord22[]                = {0x23, 0x01};               //Confirm Report status (sync)
 const char confirmObtainCache[]                   = {0x10, 0x01, 0x00};         //Confirm Obtain DP cache command
+
+      char reportWifiSignalStrenght[]             = {0x24, 0x00};               //Report Wifi Strenght
 
 
 
@@ -188,8 +200,8 @@ void TuyaSerialWriteTelegram(const char *buffer, size_t size, uint16_t seq) {
     //Data length
     else if  (i==4)                                     sendbuffer[i] = dataLen >> 8;
     else if  (i==5)                                     sendbuffer[i] = dataLen & 0xFF;
-    else if ((i==5) && (TUYA_PROTOCOL_VERSION==0x02) )  sendbuffer[i] = dataLen >> 8;
-    else if ((i==6) && (TUYA_PROTOCOL_VERSION==0x02) )  sendbuffer[i] = dataLen & 0xFF;
+    else if ((i==6) && (TUYA_PROTOCOL_VERSION==0x02) )  sendbuffer[i] = dataLen >> 8;
+    else if ((i==7) && (TUYA_PROTOCOL_VERSION==0x02) )  sendbuffer[i] = dataLen & 0xFF;
     //Data bytes
     else sendbuffer[i] = buffer[i-(telegramLen - size - 1)];
 /*
@@ -213,6 +225,8 @@ void TuyaSerialWriteTelegram(const char *buffer, size_t size, uint16_t seq) {
   printLogMsgTime("Tuya: Message: Transmit: %s\n", tuyaTxMessage.c_str());
 
   TuyaSerialWrite(sendbuffer, telegramLen);
+
+  sensorActivity = true;
 }
 
 void TuyaSerialRead() {
@@ -258,6 +272,8 @@ void loop() {
 
   TuyaSerialRead();
 
+  if (tuyaDataReceived) sensorActivity = true;
+
   if (tuyaDataReceived)                     //TUYA: handle received message
   {
     String tuyaRxBuffer;
@@ -271,6 +287,7 @@ void loop() {
     uint8_t tuyaCommand = 0;
     uint8_t tuyaVersion = 0;
     uint8_t tuyaMinMessageLen = 7;
+    uint8_t dataAdr = TUYA_PROTOCOL_VERSION==0x02 ? 8 : 6;
 
     if (tuyaRxByteCount>=7){                  // Analyze Message
       for (int i = 0; i < tuyaRxByteCount; i++) {
@@ -362,7 +379,7 @@ void loop() {
     {
       String tuyaMcuVersion;
       for (int i = 0; i < tuyaDataLen; i++) {
-        tuyaMcuVersion += tuyaReceivedBytes[6+i];
+        tuyaMcuVersion += tuyaReceivedBytes[dataAdr+i];
       }
       printLogMsgTime("Tuya: Message: Receive: Product information: %s\n" , tuyaMcuVersion.c_str() );
       tuyaProductQuery = QUERY_RECEIVED;
@@ -372,6 +389,9 @@ void loop() {
           ||  ( (tuyaCommand == 0x03) && (tuyaVersion==0x03) )  )           
     {
       printLogMsgTime("Tuya: Message: Receive: Network status confirmed (%02X) (Tuya version %02X)\n",tuyaCommand ,tuyaVersion);
+      if      (tuyaNetworkState==NETWORKSTATE_CONFIG_REQ)     tuyaNetworkState=NETWORKSTATE_CONFIG;
+      else if (tuyaNetworkState==NETWORKSTATE_CONNECTING_REQ) tuyaNetworkState=NETWORKSTATE_CONNECTING;
+      else if (tuyaNetworkState==NETWORKSTATE_CONNECTED_REQ)  tuyaNetworkState=NETWORKSTATE_CONNECTED;
     }
     else if ( ( (tuyaCommand == 0x02) && (tuyaVersion==0x03) )  )       // MCU: Query working mode response
     {
@@ -424,7 +444,7 @@ void loop() {
           printLogMsgTime("Tuya: Message: Receive: Report record type status DPID lengh (%d): not implemented\n", dpidLen);
         }
 
-        if (dataTypeImplemented) EspNowSensor.espnowMessageDataSetProgram(0xA0);
+//        if (dataTypeImplemented) EspNowSensor.espnowMessageDataSetProgram(0xA0);
         
         if (!dataTypeImplemented) ;
         else if (dpidType==1) EspNowSensor.espnowMessageDataAddSensorValue(dpid,dpidValue);
@@ -436,16 +456,25 @@ void loop() {
       }
       #ifdef ESPNOW_SEND_TUYA_TELEGRAM
         printLogMsgTime("Tuya: Message: Data: Telegram received, sending ESP!Now message.\n");
-        EspNowSensor.espnowMessageDataSetProgram(0xA0);
+//        EspNowSensor.espnowMessageDataSetProgram(0xA0);
         EspNowSensor.espnowMessageDataSend();
       #endif //ESPNOW_SEND_TUYA_TELEGRAM
 
       tuyaSendDataRecordReply = tuyaCommand;
     }
+    else if ( (tuyaCommand == 0x0B) && (tuyaVersion==0x02) )            // MCU: Query MCU firmware version Response
+    {
+      printLogMsgTime("Tuya: Message: Receive: MCU firmware version %d.%d.%d\n", tuyaReceivedBytes[dataAdr]>>6 & 0x03, tuyaReceivedBytes[dataAdr]>>4 & 0x03, tuyaReceivedBytes[dataAdr] & 0x0f  );
+    }
     else if (tuyaCommand == 0x10)             // MCU: Obtain DP cache command
     {
       printLogMsgTime("Tuya: Message: Receive: Obtain DP cache\n" );
       tuyaSendDPCacheReply = tuyaCommand;
+    }
+    else if ( (tuyaCommand == 0x24) && (tuyaVersion==0x03) )             // MCU: Get Wifi signal Strenght
+    {
+      printLogMsgTime("Tuya: Message: Receive: Get Wifi signal Strenght\n" );
+      tuyaGetWifiSignalReply = tuyaCommand;
     }
     else                                      // MCU: message not implemented
     {
@@ -465,7 +494,6 @@ void loop() {
       memset(&tuyaReceivedBytes, 0, 128);
     }
   }
-
 
 
   uint8_t startupSeqCounterOld = startupSeqCounter;
@@ -555,34 +583,62 @@ void loop() {
   if      ( (TUYA_SEND_NETWORK_STATE!=TUYA_QUERY_ONCE) && (TUYA_SEND_NETWORK_STATE!=TUYA_QUERY_ON)  ) ;                                                     //TUYA: Send networkstate
   else if ( (TUYA_SEND_NETWORK_STATE==TUYA_QUERY_ONCE) && (tuyaNetworkState==NETWORKSTATE_CONNECTED) ) ;
   else if ( (startupSeq[startupSeqCounter]!= TUYA_STARTSEQ_NETWORKSTATE) &&  (startupSeq[startupSeqCounter]!= TUYA_STARTSEQ_DONE) ) ;
-  else if (!(tuyaNetworkState==NETWORKSTATE_CONFIG) && EspNowSensor.configmode)                                                                             //TUYA: Send Network status config
+  else if (!(tuyaNetworkState==NETWORKSTATE_CONFIG)     && !(tuyaNetworkState==NETWORKSTATE_CONFIG_REQ) && EspNowSensor.configmode)                 
+                                                              //TUYA: Send Network status config
   {                         
     printLogMsgTime("Tuya: Message: Send: Network status Configuration\n");
     if  ( (TUYA_PROTOCOL_VERSION==0x00) || 
           (TUYA_PROTOCOL_VERSION==0x02) || 
           (TUYA_PROTOCOL_VERSION==0x03) ) 
         TuyaSerialWriteTelegram(reportNetworkStatusConfig[TUYA_PROTOCOL_VERSION], sizeof(reportNetworkStatusConfig[TUYA_PROTOCOL_VERSION]),tuyaTelegramSequence(0,false,true));
-    tuyaNetworkState = NETWORKSTATE_CONFIG;
+    tuyaNetworkState = NETWORKSTATE_CONFIG_REQ;
   }
-  else if (!(tuyaNetworkState==NETWORKSTATE_CONNECTING) && !EspNowSensor.readyToSend && !EspNowSensor.configmode)                                           //TUYA: Send Network status not connecting
+  else if (!(tuyaNetworkState==NETWORKSTATE_CONNECTING) && !(tuyaNetworkState==NETWORKSTATE_CONNECTING_REQ) && (tuyaNetworkState==NETWORKSTATE_DISCONNECTED) && !EspNowSensor.configmode)                                           //TUYA: Send Network status not connecting
   {                         
-    printLogMsgTime("Tuya: Message: Send: Network status Connecting\n");
+    printLogMsgTime("Tuya: Message: Send: Network status Disconnected->Connecting\n");
     if  ( (TUYA_PROTOCOL_VERSION==0x00) || 
-          (TUYA_PROTOCOL_VERSION==0x02) || 
-          (TUYA_PROTOCOL_VERSION==0x03) ) 
-        TuyaSerialWriteTelegram(reportNetworkStatusConnecting[TUYA_PROTOCOL_VERSION], sizeof(reportNetworkStatusConnecting[TUYA_PROTOCOL_VERSION]),tuyaTelegramSequence(0,false,true));
-    tuyaNetworkState = NETWORKSTATE_CONNECTING;
+          (TUYA_PROTOCOL_VERSION==0x03) ) {
+          TuyaSerialWriteTelegram(reportNetworkStatusConnecting[TUYA_PROTOCOL_VERSION], sizeof(reportNetworkStatusConnecting[TUYA_PROTOCOL_VERSION]),tuyaTelegramSequence(0,false,true));
+            tuyaNetworkState = NETWORKSTATE_CONNECTING_REQ;
+          }
+    else tuyaNetworkState = NETWORKSTATE_CONNECTING;
   }
-  else if (!(tuyaNetworkState==NETWORKSTATE_CONNECTED) && EspNowSensor.readyToSend && !EspNowSensor.configmode)                                             //TUYA: Send Network status connected
+  else if (!(tuyaNetworkState==NETWORKSTATE_CONNECTING) && !(tuyaNetworkState==NETWORKSTATE_CONNECTING_REQ) && (tuyaNetworkState==NETWORKSTATE_CONFIG) && !EspNowSensor.configmode)                                           //TUYA: Send Network status not connecting
   {                         
-    printLogMsgTime("Tuya: Message: Send: Network status Connected\n");
+    printLogMsgTime("Tuya: Message: Send: Network status Configuration->Connecting\n");
+    if  ( (TUYA_PROTOCOL_VERSION==0x00) || 
+          (TUYA_PROTOCOL_VERSION==0x03) ) {
+            TuyaSerialWriteTelegram(reportNetworkStatusConnecting[TUYA_PROTOCOL_VERSION], sizeof(reportNetworkStatusConnecting[TUYA_PROTOCOL_VERSION]),tuyaTelegramSequence(0,false,true));
+            tuyaNetworkState = NETWORKSTATE_CONNECTING_REQ;
+          }
+    else tuyaNetworkState = NETWORKSTATE_CONNECTING;
+    if (TUYA_PROTOCOL_VERSION==0x02) queryFirmwareVersion = 2;
+  }
+  else if (!(tuyaNetworkState==NETWORKSTATE_CONNECTING) && !(tuyaNetworkState==NETWORKSTATE_CONNECTING_REQ) && (tuyaNetworkState==NETWORKSTATE_CONNECTED) && !EspNowSensor.readyToSend && !EspNowSensor.configmode)                                           //TUYA: Send Network status not connecting
+  {                         
+    printLogMsgTime("Tuya: Message: Send: Network status Connected->Connecting\n");
+    if  ( (TUYA_PROTOCOL_VERSION==0x00) || 
+          (TUYA_PROTOCOL_VERSION==0x03) ) {
+            TuyaSerialWriteTelegram(reportNetworkStatusConnecting[TUYA_PROTOCOL_VERSION], sizeof(reportNetworkStatusConnecting[TUYA_PROTOCOL_VERSION]),tuyaTelegramSequence(0,false,true));
+            tuyaNetworkState = NETWORKSTATE_CONNECTING_REQ;
+          }
+    else tuyaNetworkState = NETWORKSTATE_CONNECTING;
+  }
+  else if (!(tuyaNetworkState==NETWORKSTATE_CONNECTED)  && !(tuyaNetworkState==NETWORKSTATE_CONNECTED_REQ) && (tuyaNetworkState==NETWORKSTATE_CONNECTING) && EspNowSensor.readyToSend && !EspNowSensor.configmode)                                             //TUYA: Send Network status connected
+  {                         
+    printLogMsgTime("Tuya: Message: Send: Network status Connecting->Connected\n");
     if  ( (TUYA_PROTOCOL_VERSION==0x00) || 
           (TUYA_PROTOCOL_VERSION==0x02) || 
           (TUYA_PROTOCOL_VERSION==0x03) ) 
         TuyaSerialWriteTelegram(reportNetworkStatusConnected[TUYA_PROTOCOL_VERSION], sizeof(reportNetworkStatusConnected[TUYA_PROTOCOL_VERSION]),tuyaTelegramSequence(0,false,true));
-    tuyaNetworkState = NETWORKSTATE_CONNECTED;
+    tuyaNetworkState = NETWORKSTATE_CONNECTED_REQ;
   }
 
+  if ( (tuyaNetworkState==NETWORKSTATE_CONNECTED) && (queryFirmwareVersion!=0) ) {
+    printLogMsgTime("Tuya: Message: Send: Query MCU Firmware version\n");
+    TuyaSerialWriteTelegram(queryFirmware, sizeof(queryFirmware),tuyaTelegramSequence(0,false,true));
+    queryFirmwareVersion = 0;
+  }
 
   if   (tuyaSettingsModeReply!=0){                                                                                                //TUYA: Request configuration mode
     printLogMsgTime("Tuya: Message: Send: Confirm settings mode (%d)\n", tuyaSettingsModeReply);                                                                      
@@ -603,11 +659,19 @@ void loop() {
   if ( (tuyaSendDPCacheReply!=0)  && (tuyaSendDataRecordReply==0) && !EspNowSensor.broadcastSending )                           //TUYA: Send DP cache confirm 
   {
     delay(50);
-    if      (tuyaSendDataRecordReply=10)  printLogMsgTime("Tuya: Message: Send: Confirm Obtain DP cache command (%d)\n",tuyaSendDPCacheReply);
+    if      (tuyaSendDataRecordReply==0x10)  printLogMsgTime("Tuya: Message: Send: Confirm Obtain DP cache command (%d)\n",tuyaSendDPCacheReply);
     TuyaSerialWriteTelegram(confirmObtainCache, sizeof(confirmObtainCache),tuyaTelegramSequence(0,false,false));
     tuyaSendDPCacheReply = 0;
   }
-  
+  if ( (tuyaGetWifiSignalReply!=0)  && !EspNowSensor.broadcastSending )                           //TUYA: Get Wifi Signal strength reply
+  {
+    if (EspNowSensor.configmode) reportWifiSignalStrenght[1] = WiFi.RSSI();
+    else reportWifiSignalStrenght[1] = 0xEC;                                //Signal strenght not implemented -> send -20db
+    printLogMsgTime("Tuya: Message: Send: Reply Get Wi-Fi signal strength (%02X): %ddb\n",tuyaGetWifiSignalReply, (int8_t)reportWifiSignalStrenght[1]);
+    if      (tuyaGetWifiSignalReply==0x24)  TuyaSerialWriteTelegram( reportWifiSignalStrenght, sizeof(reportWifiSignalStrenght),tuyaTelegramSequence(0,false,false));
+    tuyaGetWifiSignalReply = 0;
+  }
+
   #ifdef TUYA_MCU_WAKEUP_PIN
     if ( ((millis()-tuyaMcuWakeupTime) > TUYA_MCU_WAKEUP_PULSE_LEN) && (tuyaMcuWakeupTime>0) )
     {
@@ -616,7 +680,10 @@ void loop() {
     }
   #endif
 
-  EspNowSensor.shutDownCheck();
+  if (EspNowSensor.broadcastSending) sensorActivity = true;
+
+  EspNowSensor.shutDownCheck(sensorActivity);
+  sensorActivity = false;
   printLogMsgIdle();
   delay(10);    // Add a small delay to avoid overwhelming the CPU
 }

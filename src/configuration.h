@@ -1,7 +1,7 @@
 
 #define PRODUCT                             "ESP-NOW Tuya Sensor"
 #define PRODUCT_FAMILY_KEY                  0x01
-#define VERSION                             0x001201
+#define VERSION                             0x001202
 #define OWNER                               "gea"
 
 #define ESPNOW_TELEGRAM_EXTENDED
@@ -95,6 +95,28 @@
         #define TUYA_BAUD_RATE              9600
     #endif  
 
+    #ifdef TH01PRO_TEMP_HUM_SENSOR
+        #define PRODUCT_ID                  "TH01Pro"
+        #define DESCRIPTION                 "TH01Pro Temperature & Humidity Sensor + Display"
+        #define PRODUCT_KEY                 0x09
+        #define DPID_BATTERY                0x68
+        #define DPID_VALUE1                 0x66
+        #define DPID_VALUE2                 0x67  
+        #define DPID_BATTERY_ESPNOW             3           //TH01 compatibility
+        #define DPID_VALUE1_ESPNOW              1  
+        #define DPID_VALUE2_ESPNOW              2
+        #if  (defined TYWE3S || defined ESP12)
+            #define ACTIVE_PIN                  2   
+            #define ACTIVE_PIN_POLARITY         LOW
+            #define SERIAL_DEBUG_SW
+            #define SERIAL_TUYA_PORT            0
+        #endif
+        #define ESPNOW_SEND_DATA_COMPLETE
+        #define TUYA_PROTOCOL_VERSION           0x03 
+        #define TUYA_BAUD_RATE              9600
+        #define TUYA_STARTSEQ                   {TUYA_STARTSEQ_DELAY, TUYA_STARTSEQ_HEARTBEAT, TUYA_STARTSEQ_PRODUCT, TUYA_STARTSEQ_WORKINGMODE ,TUYA_STARTSEQ_NETWORKSTATE, TUYA_STARTSEQ_DONE}
+
+    #endif  
 
     #ifdef P01_PIR_SENSOR
         #define PRODUCT_ID                  "P01"
@@ -169,7 +191,7 @@
         #define DPID_STATE_POLARITY             0
         #define DPID_BATTERY                    3
         #define ESPNOW_ALIVE
-        #define TUYA_PRODUCT_QUERY_TIMEOUT    3000
+        #define TUYA_PRODUCT_QUERY_TIMEOUT      3000
         #define CONFIG_MODE_TIMEOUT             60000
         #ifdef TYWE3S
             #define ACTIVE_PIN                  2
@@ -210,6 +232,7 @@
         #define DPID_VALUE1                     5           //0x05	298	    29,8 °C	Temperature
         #define DPID_VALUE2                     3           //0x03	0	    0%	    Humidity
 //        #define DPID_VALUE3                   101         //0x65	856	    85,6 °F	Temperature
+        #define DPID_BATTERY_LEVEL  
         #define DPID_BATTERY_ESPNOW             3           //TH01 compatibility
         #define DPID_VALUE1_ESPNOW              1  
         #define DPID_VALUE2_ESPNOW              2
@@ -228,24 +251,32 @@
         #define TUYA_STARTSEQ                   {TUYA_STARTSEQ_DELAY, TUYA_STARTSEQ_HEARTBEAT, TUYA_STARTSEQ_PRODUCT, TUYA_STARTSEQ_WORKINGMODE, TUYA_STARTSEQ_HEARTBEAT_RESTART_DONE ,TUYA_STARTSEQ_NETWORKSTATE, TUYA_STARTSEQ_DP_STATUS, TUYA_STARTSEQ_DONE}
     #endif  
 
-    #ifdef SCENE_CUBE
+    #ifdef SMART_CUBE_SCENE
         #define PRODUCT_ID                      "SCSC"
         #define DESCRIPTION                     "Smart cube scene controller"
         #define PRODUCT_KEY                     0x30
-        #define DPID_STATE                      32
-        #define DPID_STATE_DPID_AS_VALUE                                  //Unassigned DPID used as state value
-        #define DPID_BATTERY                    1
+        #define DPID_STATE_DPID_AS_VALUE
+        #define DPID_STATE_ESPNOW               1
+        #define DPID_STATE_DPID_STATE_MAPPING   { {1, 16}, {2,17}, {3,18}, {4,19}, {5,1}, {6,2} }     //1=Top, 2=Bottom , 3=Right , 4=Left , 5=Knock , 6=Shake
+        #define DPID_BATTERY                    10
+        #define DPID_BATTERY_ESPNOW             3
+        #define INACTIVITY_TIMEOUT              500
         #ifdef ESP32C2WROOM06
             #define POWER_OFF_DEEPSLEEP
             #define DEEPSLEEP_WAKEUP_GPIO_PIN1  5
             #define TUYA_MCU_WAKEUP_PIN         4                 //ESP8684-WROOM-06, ESP8685-WROOM-06 (ZTU Replacement)   
             #define SETUP_PIN                   9
             #define SETUP_PIN_POLARITY          LOW
+            #define ACTIVE_PIN                  8
+            #define ACTIVE_PIN_POLARITY         LOW
             #define SERIAL_TUYA_TX_PIN          18
             #define SERIAL_TUYA_RX_PIN          10
             #define SERIAL_TUYA_PORT            1 
         #endif
         #define ESPNOW_SEND_DATA_COMPLETE
+        #define ESPNOW_ALIVE
+        #define TUYA_STARTSEQ                   {TUYA_STARTSEQ_DELAY, TUYA_STARTSEQ_DONE}
+        #define TUYA_SEND_STARTUP_DELAY         500
         #define TUYA_PROTOCOL_VERSION           0x02                //Zigbee
         #define TUYA_BAUD_RATE                  115200
     #endif  
@@ -303,10 +334,6 @@
         #define TUYA_MCU_WAKEUP_PULSE_LEN       60
     #endif
 #endif
-
-
-
-
 
 #ifndef PRODUCT_ID
     #define PRODUCT_ID                          "TUYA"
